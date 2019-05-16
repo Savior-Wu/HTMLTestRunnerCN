@@ -116,12 +116,19 @@ import sys
 import time
 import unittest
 from xml.sax import saxutils
+import json
 
-try:
+if sys.version_info<(3,0):
     reload(sys)
     sys.setdefaultencoding('utf-8')
-except ImportError:
+else:
     pass
+
+# try:
+#     reload(sys)
+#     sys.setdefaultencoding('utf-8')
+# except ImportError:
+    # pass
 
 # ------------------------------------------------------------------------
 # The redirectors below are used to capture output during testing. Output
@@ -494,11 +501,12 @@ class _TestResult(TestResult):
         self.success_count = 0
         self.failure_count = 0
         self.error_count = 0
+        self.skip_count = 0
         self.verbosity = verbosity
 
         # result is a list of result in 4 tuple
         # (
-        #   result code (0: success; 1: fail; 2: error),
+        #   result code (0: success; 1: fail; 2: error; 3: skip),
         #   TestCase object,
         #   Test output (byte string),
         #   stack trace,
@@ -578,6 +586,20 @@ class _TestResult(TestResult):
         else:
             sys.stderr.write('F')
 
+    def addSkip(self, test, reason):
+        "refact addSkip"
+        self.skip_count += 1
+        TestResult.addSkip(self, test, reason)
+        _, _exc_str = self.skipped[-1]
+        output = self.complete_output()
+        self.result.append((3, test, output, _exc_str))
+        if self.verbosity > 1:
+            sys.stderr.write('F  ')
+            sys.stderr.write(str(test))
+            sys.stderr.write('\n')
+        else:
+            sys.stderr.write('F')
+
 
 class HTMLTestReportEN(Template_mixin):
     """
@@ -611,6 +633,45 @@ class HTMLTestReportEN(Template_mixin):
         sys.stderr.write('\nTime Elapsed: %s' % (self.stopTime-self.startTime))
         return result
 
+
+    def normal_run_before(self, test):
+        "use test case or test suite create result class, so that can keep origin method `run`"
+        result = _TestResult(self.verbosity)
+        test(result)
+        return result
+
+    def result_to_file(self, test, file):
+        "write test case result to json file so that can easily generate multi-processing test case"
+        result = _TestResult(test)
+        test(result)
+        sortresult = self.sortResult(result.result)
+        cls_data = {}
+        for (cls, cls_results) in enumerate(sortresult):
+            # subtotal for a class
+            np = nf = ne = ns = 0
+            for n, t, o, e in cls_results:
+                if n == 0: np += 1
+                elif n == 1: nf += 1
+                elif n == 2: ne += 1
+                else: ns += 1
+
+            if cls.__module__ == "__main__":
+                cls_data['name'] = cls.__name__
+            else:
+                cls_data['name'] = "%s.%s" % (cls.__module__, cls.__name__)
+            cls_data['doc'] = cls.__doc__ and cls.__doc__.split("\n")[0] or ""
+            cls_data['desc'] = cls_data['doc'] and '%s: %s' % (cls_data['name'], cls_data['doc']) or cls_data['name']
+
+            cls_data['pass'] = np
+            cls_data['fail'] = nf
+            cls_data['error'] = ne
+            cls_data['skip'] = ns
+            cls_data['count'] = np + nf + ne + ns
+
+            for tid, (n,t,o,e) in enumerate(cls_results):
+                cls_data['cases'].append([tid, n, t, o, e])
+            with open(file, 'w+') as fp:
+                json.dump(cls_data, fp)
 
     def sortResult(self, result_list):
         # unittest does not seems to run in any particular order.
