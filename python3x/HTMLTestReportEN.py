@@ -205,6 +205,7 @@ class Template_mixin(object):
     0: 'pass',
     1: 'fail',
     2: 'error',
+    3: 'skip'
     }
 
     DEFAULT_TITLE = 'Test Report'
@@ -237,14 +238,16 @@ output_list = Array();
 $("button[id^='btn_pt']").addClass("btn btn-success");
 $("button[id^='btn_ft']").addClass("btn btn-danger");
 $("button[id^='btn_et']").addClass("btn btn-warning");
+$("button[id^='btn_st']").addClass("btn btn-info");
 
 /*level
 add error button event --Findyou v0.8.2.3
-0:Pass    //pt none, ft hiddenRow, et hiddenRow
-1:Failed  //pt hiddenRow, ft none, et hiddenRow
-2:Error    //pt hiddenRow, ft hiddenRow, et none
-3:All     //pt none, ft none, et none
+0:Pass    //pt none, ft hiddenRow, et hiddenRow, st hiddenRow
+1:Failed  //pt hiddenRow, ft none, et hiddenRow, st hiddenRow
+2:Error    //pt hiddenRow, ft hiddenRow, et none, st hiddenRow
+3:All     //pt none, ft none, et none, st none
 4:Summary //all hiddenRow
+5:Skiped  //pt hiddenRow, ft hiddenRow, et hiddenRow, st none
 */
 
 //add Error button event --Findyou v0.8.2.3
@@ -254,7 +257,7 @@ function showCase(level) {
         tr = trs[i];
         id = tr.id;
         if (id.substr(0,2) == 'ft') {
-            if (level == 0 || level == 2 || level == 4 ) {
+            if (level == 0 || level == 2 || level == 4 || level == 5) {
                 tr.className = 'hiddenRow';
             }
             else {
@@ -262,7 +265,7 @@ function showCase(level) {
             }
         }
         if (id.substr(0,2) == 'pt') {
-            if (level == 1 || level == 2 || level == 4) {
+            if (level == 1 || level == 2 || level == 4 || level == 5) {
                 tr.className = 'hiddenRow';
             }
             else {
@@ -270,7 +273,15 @@ function showCase(level) {
             }
         }
         if (id.substr(0,2) == 'et') {
-            if (level == 0 || level == 1 || level == 4) {
+            if (level == 0 || level == 1 || level == 4 || level == 5) {
+                tr.className = 'hiddenRow';
+            }
+            else {
+                tr.className = '';
+            }
+        }
+        if (id.substr(0,2) == 'st') {
+            if (level == 0 || level == 1 || level == 2 || level == 4) {
                 tr.className = 'hiddenRow';
             }
             else {
@@ -308,6 +319,10 @@ function showClassDetail(cid, count) {
         }
         if (!tr) {
             tid = 'e' + tid0;
+            tr = document.getElementById(tid);
+        }
+        if (!tr) {
+            tid = 's' + tid0;
             tr = document.getElementById(tid);
         }
         id_list[i] = tid;
@@ -369,6 +384,7 @@ table       { font-size: 100%; }
 .passCase   { color: #5cb85c; }
 .failCase   { color: #d9534f; font-weight: bold; }
 .errorCase  { color: #f0ad4e; font-weight: bold; }
+.skipCase  { color: black; font-weigth: bold; }
 .hiddenRow  { display: none; }
 .testcase   { margin-left: 2em; }
 </style>
@@ -397,15 +413,17 @@ table       { font-size: 100%; }
     # 汉化,加美化效果 --Findyou
     REPORT_TMPL = """
 <p id='show_detail_line'>
+<a class="btn btn-info" href='javascript:showCase(3)'>ALL{ %(count)s }</a>
 <a class="btn btn-primary" href='javascript:showCase(4)'>Summary{ %(passrate)s }</a>
 <a class="btn btn-success" href='javascript:showCase(0)'>Passed{ %(Pass)s }</a>
 <a class="btn btn-danger" href='javascript:showCase(1)'>Failed{ %(fail)s }</a>
 <a class="btn btn-warning" href='javascript:showCase(2)'>Error{ %(error)s }</a>
-<a class="btn btn-info" href='javascript:showCase(3)'>ALL{ %(count)s }</a>
+<a class="btn btn-info" href='javascript:showCase(5)'>Skipped{ %(skip)s }</a>
 </p>
 <table id='result_table' class="table table-condensed table-bordered table-hover">
 <colgroup>
 <col align='left' />
+<col align='right' />
 <col align='right' />
 <col align='right' />
 <col align='right' />
@@ -418,6 +436,7 @@ table       { font-size: 100%; }
     <td>Pass</td>
     <td>Fail</td>
     <td>Error</td>
+    <td>Skip</td>
     <td>View</td>
 </tr>
 %(test_list)s
@@ -427,10 +446,11 @@ table       { font-size: 100%; }
     <td>%(Pass)s</td>
     <td>%(fail)s</td>
     <td>%(error)s</td>
+    <td>%(skip)s</td>
     <td>Passing rate: %(passrate)s</td>
 </tr>
 </table>
-""" # variables: (test_list, count, Pass, fail, error ,passrate)
+""" # variables: (test_list, count, Pass, fail, error , skip, passrate)
 
     REPORT_CLASS_TMPL = r"""
 <tr class='%(style)s'>
@@ -439,23 +459,24 @@ table       { font-size: 100%; }
     <td class="text-center">%(Pass)s</td>
     <td class="text-center">%(fail)s</td>
     <td class="text-center">%(error)s</td>
+    <td class="text-center">%(skip)s</td>
     <td class="text-center"><a href="javascript:showClassDetail('%(cid)s',%(count)s)" class="detail" id='%(cid)s'>Detail</a></td>
 </tr>
-""" # variables: (style, desc, count, Pass, fail, error, cid)
+""" # variables: (style, desc, count, Pass, fail, error, skip, cid)
 
     #失败 的样式，去掉原来JS效果，美化展示效果  -Findyou
     REPORT_TEST_WITH_OUTPUT_TMPL = r"""
 <tr id='%(tid)s' class='%(Class)s'>
     <td class='%(style)s'><div class='testcase'>%(desc)s</div></td>
     <td colspan='5' align='center'>
-    <!--默认收起output信息 -Findyou
+    <!--默认收起output信息 -Findyou  -->
     <button id='btn_%(tid)s' type="button"  class="btn-xs collapsed" data-toggle="collapse" data-target='#div_%(tid)s'>%(status)s</button>
-    <div id='div_%(tid)s' class="collapse">  -->
+    <div id='div_%(tid)s' class="collapse">
 
-    <!-- 默认展开output信息 -Findyou -->
+    <!-- 默认展开output信息 -Findyou
     <button id='btn_%(tid)s' type="button"  class="btn-xs" data-toggle="collapse" data-target='#div_%(tid)s'>%(status)s</button>
-    <div id='div_%(tid)s' class="collapse in">
-    <pre>
+    <div id='div_%(tid)s' class="collapse in">  -->
+    <pre class="text-left">
     %(script)s
     </pre>
     </div>
@@ -668,10 +689,27 @@ class HTMLTestReportEN(Template_mixin):
             cls_data['skip'] = ns
             cls_data['count'] = np + nf + ne + ns
 
+            case_data = []
+            # has error...
             for tid, (n,t,o,e) in enumerate(cls_results):
-                cls_data['cases'].append([tid, n, t, o, e])
+                case_data.append([tid, n, t, o, e])
+            cls_data['cases'] = case_data
             with open(file, 'w+') as fp:
-                json.dump(cls_data, fp)
+                json.dump(cls_data, fp, indent=4)
+
+    def sumary_result_files(self, file_lists):
+        "read test result data from files, the file is written by function result_to_file"
+        if isinstance(file_lists, list):
+            data = []
+            if len(file_lists) > 1:
+                for file in file_lists:
+                    if file == '':
+                        continue
+                    with open(file, 'r') as fp:
+                        data.append(json.load(fp))
+            return data
+        else:
+            return "there hasn't file list, please check the argument"
 
     def sortResult(self, result_list):
         # unittest does not seems to run in any particular order.
@@ -697,10 +735,11 @@ class HTMLTestReportEN(Template_mixin):
         startTime = str(self.startTime)[:19]
         duration = str(self.stopTime - self.startTime)
         status = []
-        status.append('ALL %s' % (result.success_count + result.failure_count + result.error_count))
+        status.append('ALL %s' % (result.success_count + result.failure_count + result.error_count + result.skip_count))
         if result.success_count: status.append('Pass %s'    % result.success_count)
         if result.failure_count: status.append('Failure %s' % result.failure_count)
         if result.error_count:   status.append('Error %s'   % result.error_count  )
+        if result.skip_count:   status.append('Skip %s'   % result.skip_count  )
         if status:
             status = '，'.join(status)
 		# 合入Github：boafantasy代码
@@ -766,7 +805,9 @@ class HTMLTestReportEN(Template_mixin):
             for n,t,o,e in cls_results:
                 if n == 0: np += 1
                 elif n == 1: nf += 1
-                else: ne += 1
+                elif n == 2: ne += 1
+                else:
+                    ns += 1
 
             # format class description
             if cls.__module__ == "__main__":
@@ -777,12 +818,13 @@ class HTMLTestReportEN(Template_mixin):
             desc = doc and '%s: %s' % (name, doc) or name
 
             row = self.REPORT_CLASS_TMPL % dict(
-                style = ne > 0 and 'warning' or nf > 0 and 'danger' or 'success',
+                style = ns > 0 and 'info' or ne > 0 and 'warning' or nf > 0 and 'danger' or 'success',
                 desc = desc,
                 count = np+nf+ne,
                 Pass = np,
                 fail = nf,
                 error = ne,
+                skip = ns,
                 cid = 'c%s' % (cid+1),
             )
             rows.append(row)
@@ -796,6 +838,7 @@ class HTMLTestReportEN(Template_mixin):
             Pass = str(result.success_count),
             fail = str(result.failure_count),
             error = str(result.error_count),
+            skip = str(result.skip_count),
             passrate =self.passrate,
         )
         return report
@@ -806,7 +849,7 @@ class HTMLTestReportEN(Template_mixin):
         has_output = bool(o or e)
         # ID修改点为下划线,支持Bootstrap折叠展开特效 - Findyou v0.8.2.1
         #增加error分类 - Findyou v0.8.2.3
-        tid = (n == 0 and 'p' or n == 1 and 'f' or 'e') + 't%s_%s' % (cid + 1, tid + 1)
+        tid = (n == 0 and 'p' or n == 1 and 'f' or n == 3 and 'e' or 's') + 't%s_%s' % (cid + 1, tid + 1)
         name = t.id().split('.')[-1]
         doc = t.shortDescription() or ""
         desc = doc and ('%s: %s' % (name, doc)) or name
@@ -841,7 +884,7 @@ class HTMLTestReportEN(Template_mixin):
         row = tmpl % dict(
             tid = tid,
             Class = (n == 0 and 'hiddenRow' or 'none'),
-            style = n == 2 and 'errorCase' or (n == 1 and 'failCase' or 'passCase'),
+            style = n == 3 and 'skipCase' or (n == 2 and 'errorCase' or (n == 1 and 'failCase' or 'passCase')),
             desc = desc,
             script = script,
             status = self.STATUS[n],
@@ -849,6 +892,80 @@ class HTMLTestReportEN(Template_mixin):
         rows.append(row)
         if not has_output:
             return
+
+    def _generate_report_external(self, data_list):
+        if isinstance(data_list, list):
+            pass_count = 0
+            fail_count = 0
+            error_count = 0
+            skip_count = 0
+            all_count = 0
+            cid = 0
+            for single_class in data_list:
+                pass_count += single_class['pass']
+                fail_count += single_class['fail']
+                error_count += single_class['error']
+                skip_count += single_class['skip']
+                all_count += single_class['count']
+                
+                row = self.REPORT_CLASS_TMPL % dict(
+                style = ns > 0 and 'info' or ne > 0 and 'warning' or nf > 0 and 'danger' or 'success',
+                desc = single_class['desc'],
+                count = single_class['count'],
+                Pass = single_class['pass'],
+                fail = single_class['fail'],
+                error = single_class['error'],
+                skip = single_class['skip'],
+                cid = 'c%s' % (cid+1),
+                )
+                
+                rows.append(row)
+                
+                tid = 0
+                for _, n, t, o, e in enumerate(single_class['cases']):
+                    tid = (n == 0 and 'p' or n == 1 and 'f' or n == 3 and 'e' or 's') + 't%s_%s' % (cid + 1, tid + 1)
+                    has_output = bool(o or e)
+                    name = t.split('.')[-1]
+                    doc = t.shortDescription() or ""
+                    desc = doc and ('%s: %s' % (name, doc)) or name
+                    tmpl = has_output and self.REPORT_TEST_WITH_OUTPUT_TMPL or self.REPORT_TEST_NO_OUTPUT_TMPL
+                    if isinstance(o, str):
+                        # TODO: some problem with 'string_escape': it escape \n and mess up formating
+                        # uo = unicode(o.encode('string_escape'))
+                        try:
+                            uo = o.decode('latin-1')
+                        except:
+                            uo = o.decode('utf-8')
+                    else:
+                        uo = o
+                    if isinstance(e, str):
+                        # TODO: some problem with 'string_escape': it escape \n and mess up formating
+                        # ue = unicode(e.encode('string_escape'))
+                        try:
+                            ue = e.decode('latin-1')
+                        except:
+                            ue = e.decode('utf-8')
+                    else:
+                        ue = e
+
+                    script = self.REPORT_TEST_OUTPUT_TMPL % dict(
+                        id = tid,
+                        output = saxutils.escape(uo+ue),
+                    )
+
+                    row = tmpl % dict(
+                        tid = tid,
+                        Class = (n == 0 and 'hiddenRow' or 'none'),
+                        style = n == 3 and 'skipCase' or (n == 2 and 'errorCase' or (n == 1 and 'failCase' or 'passCase')),
+                        desc = desc,
+                        script = script,
+                        status = self.STATUS[n],
+                    )
+                    rows.append(row)
+
+
+        else:
+            return "the argument isn't an expected test result list"
 
     def _generate_ending(self):
         return self.ENDING_TMPL
