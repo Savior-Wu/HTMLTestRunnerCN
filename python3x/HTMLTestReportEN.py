@@ -688,6 +688,7 @@ class HTMLTestReportEN(Template_mixin):
             cls_data['error'] = ne
             cls_data['skip'] = ns
             cls_data['count'] = np + nf + ne + ns
+            cls_data['date'] = str(datetime.datetime.timestamp(datetime.datetime.now())).split('.')[0]
 
             case_data = []
             # has error...
@@ -901,6 +902,7 @@ class HTMLTestReportEN(Template_mixin):
             skip_count = 0
             all_count = 0
             cid = 0
+            rows = []
             for single_class in data_list:
                 pass_count += single_class['pass']
                 fail_count += single_class['fail']
@@ -909,7 +911,7 @@ class HTMLTestReportEN(Template_mixin):
                 all_count += single_class['count']
                 
                 row = self.REPORT_CLASS_TMPL % dict(
-                style = ns > 0 and 'info' or ne > 0 and 'warning' or nf > 0 and 'danger' or 'success',
+                style = single_class['skip'] > 0 and 'info' or single_class['error'] > 0 and 'warning' or single_class['fail'] > 0 and 'danger' or 'success',
                 desc = single_class['desc'],
                 count = single_class['count'],
                 Pass = single_class['pass'],
@@ -922,48 +924,63 @@ class HTMLTestReportEN(Template_mixin):
                 rows.append(row)
                 
                 tid = 0
-                for _, n, t, o, e in enumerate(single_class['cases']):
-                    tid = (n == 0 and 'p' or n == 1 and 'f' or n == 3 and 'e' or 's') + 't%s_%s' % (cid + 1, tid + 1)
-                    has_output = bool(o or e)
-                    name = t.split('.')[-1]
-                    doc = t.shortDescription() or ""
-                    desc = doc and ('%s: %s' % (name, doc)) or name
-                    tmpl = has_output and self.REPORT_TEST_WITH_OUTPUT_TMPL or self.REPORT_TEST_NO_OUTPUT_TMPL
-                    if isinstance(o, str):
-                        # TODO: some problem with 'string_escape': it escape \n and mess up formating
-                        # uo = unicode(o.encode('string_escape'))
-                        try:
-                            uo = o.decode('latin-1')
-                        except:
-                            uo = o.decode('utf-8')
-                    else:
-                        uo = o
-                    if isinstance(e, str):
-                        # TODO: some problem with 'string_escape': it escape \n and mess up formating
-                        # ue = unicode(e.encode('string_escape'))
-                        try:
-                            ue = e.decode('latin-1')
-                        except:
-                            ue = e.decode('utf-8')
-                    else:
-                        ue = e
+                for case in enumerate(single_class['cases']):
+                    for _, n, t, o, e in case:
+                        tid = (n == 0 and 'p' or n == 1 and 'f' or n == 3 and 'e' or 's') + 't%s_%s' % (cid + 1, tid + 1)
+                        has_output = bool(o or e)
+                        name = t.split('.')[-1]
+                        doc = t.shortDescription() or ""
+                        desc = doc and ('%s: %s' % (name, doc)) or name
+                        tmpl = has_output and self.REPORT_TEST_WITH_OUTPUT_TMPL or self.REPORT_TEST_NO_OUTPUT_TMPL
+                        if isinstance(o, str):
+                            # TODO: some problem with 'string_escape': it escape \n and mess up formating
+                            # uo = unicode(o.encode('string_escape'))
+                            try:
+                                uo = o.decode('latin-1')
+                            except:
+                                uo = o.decode('utf-8')
+                        else:
+                            uo = o
+                        if isinstance(e, str):
+                            # TODO: some problem with 'string_escape': it escape \n and mess up formating
+                            # ue = unicode(e.encode('string_escape'))
+                            try:
+                                ue = e.decode('latin-1')
+                            except:
+                                ue = e.decode('utf-8')
+                        else:
+                            ue = e
 
-                    script = self.REPORT_TEST_OUTPUT_TMPL % dict(
-                        id = tid,
-                        output = saxutils.escape(uo+ue),
-                    )
+                        script = self.REPORT_TEST_OUTPUT_TMPL % dict(
+                            id = tid,
+                            output = saxutils.escape(uo+ue),
+                        )
 
-                    row = tmpl % dict(
-                        tid = tid,
-                        Class = (n == 0 and 'hiddenRow' or 'none'),
-                        style = n == 3 and 'skipCase' or (n == 2 and 'errorCase' or (n == 1 and 'failCase' or 'passCase')),
-                        desc = desc,
-                        script = script,
-                        status = self.STATUS[n],
-                    )
-                    rows.append(row)
-
-
+                        row = tmpl % dict(
+                            tid = tid,
+                            Class = (n == 0 and 'hiddenRow' or 'none'),
+                            style = n == 3 and 'skipCase' or (n == 2 and 'errorCase' or (n == 1 and 'failCase' or 'passCase')),
+                            desc = desc,
+                            script = script,
+                            status = self.STATUS[n],
+                        )
+                        rows.append(row)
+            
+            if (pass_count + fail_count + error_count) > 0:
+                passrate = str("%.2f%%" % (float(pass_count) / float(pass_count + fail_count + error_count) * 100))
+            else:
+                passrate = "0.00 %"
+            
+            report = self.REPORT_TMPL % dict(
+            test_list = ''.join(rows),
+            count = str(all_count),
+            Pass = str(pass_count),
+            fail = str(fail_count),
+            error = str(error_count),
+            skip = str(skip_count),
+            passrate = passrate,
+            )
+            return report
         else:
             return "the argument isn't an expected test result list"
 
