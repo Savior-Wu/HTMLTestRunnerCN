@@ -644,13 +644,23 @@ class HTMLTestReportEN(Template_mixin):
         self.startTime = datetime.datetime.now()
 
 
-    def run(self, test):
+    def run(self, test, files):
         "Run the given test case or test suite."
-        result = _TestResult(self.verbosity)
-        test(result)
-        self.stopTime = datetime.datetime.now()
-        self.generateReport(test, result)
-        # print >>sys.stderr, '\nTime Elapsed: %s' % (self.stopTime-self.startTime)
+        "add branch read result from files"
+        # result = _TestResult(self.verbosity)
+        # test(result)
+        # self.stopTime = datetime.datetime.now()
+        # self.generateReport(test, result)
+        # # print >>sys.stderr, '\nTime Elapsed: %s' % (self.stopTime-self.startTime)
+        # sys.stderr.write('\nTime Elapsed: %s' % (self.stopTime-self.startTime))
+        if not isinstance(files, dict):
+            result = self.normal_run_before(test)
+            self.stopTime = datetime.datetime.now()
+            self.generateReport(test, result)
+        else:
+            result = self.summary_result_files(files)
+            self.stopTime = datetime.datetime.now()
+            self._generate_report_external(result)
         sys.stderr.write('\nTime Elapsed: %s' % (self.stopTime-self.startTime))
         return result
 
@@ -698,7 +708,7 @@ class HTMLTestReportEN(Template_mixin):
             with open(file, 'w+') as fp:
                 json.dump(cls_data, fp, indent=4)
 
-    def sumary_result_files(self, file_lists):
+    def summary_result_files(self, file_lists):
         "read test result data from files, the file is written by function result_to_file"
         if isinstance(file_lists, list):
             data = []
