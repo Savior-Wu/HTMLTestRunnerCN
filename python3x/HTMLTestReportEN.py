@@ -117,6 +117,7 @@ import time
 import unittest
 from xml.sax import saxutils
 import json
+import copy
 
 if sys.version_info<(3,0):
     reload(sys)
@@ -515,7 +516,7 @@ class _TestResult(TestResult):
     # note: _TestResult is a pure representation of results.
     # It lacks the output and reporting ability compares to unittest._TextTestResult.
 
-    def __init__(self, verbosity=1):
+    def __init__(self, verbosity=1, retry=2, save_last_retry=True):
         TestResult.__init__(self)
         self.stdout0 = None
         self.stderr0 = None
@@ -535,6 +536,11 @@ class _TestResult(TestResult):
         self.result = []
         #增加一个测试通过率 --Findyou
         self.passrate=float(0)
+
+        self.retry = retry
+        self.save_last_retry = save_last_retry
+        self.trys = 0
+        self.status = 0
 
 
     def startTest(self, test):
@@ -566,11 +572,37 @@ class _TestResult(TestResult):
         # Usually one of addSuccess, addError or addFailure would have been called.
         # But there are some path in unittest that would bypass this.
         # We must disconnect stdout in stopTest(), which is guaranteed to be called.
+        
+        if self.retry and self.retry>=1:
+            if self.status == 1:
+                self.trys += 1
+                if self.trys<=self.retry:
+                    if self.save_last_retry:
+                        testcase_result = self.result.pop(-1)
+                        if testcase_result[0] == 1:
+                            self.failure_count -= 1
+                        else:
+                            self.error_count -= 1
+                        self.testsRun -= 1
+                    test = copy.copy(test)
+                    sys.stderr.write('Restart testing ...')
+                    sys.stderr.write(str(test))
+                    sys.stderr.write('..%d \n' % self.trys)
+                    doc = "" and test.shortDescription()
+                    if doc.find('_retry') != -1:
+                        doc = doc[:doc.find('_retry')]
+                    desc = "%s_retry_%s".format(doc, self.trys)
+                    test._testMethodDoc = desc
+                    test(self)
+                else:
+                    self.status = 0
+                    self.trys = 0
         self.complete_output()
 
 
     def addSuccess(self, test):
         self.success_count += 1
+        self.status = 0
         TestResult.addSuccess(self, test)
         output = self.complete_output()
         self.result.append((0, test, output, ''))
@@ -583,6 +615,7 @@ class _TestResult(TestResult):
 
     def addError(self, test, err):
         self.error_count += 1
+        self.status = 1
         TestResult.addError(self, test, err)
         _, _exc_str = self.errors[-1]
         output = self.complete_output()
@@ -596,6 +629,7 @@ class _TestResult(TestResult):
 
     def addFailure(self, test, err):
         self.failure_count += 1
+        self.status = 1
         TestResult.addFailure(self, test, err)
         _, _exc_str = self.failures[-1]
         output = self.complete_output()
@@ -610,6 +644,7 @@ class _TestResult(TestResult):
     def addSkip(self, test, reason):
         "refact addSkip"
         self.skip_count += 1
+        self.status = 0
         TestResult.addSkip(self, test, reason)
         _, _exc_str = self.skipped[-1]
         output = self.complete_output()
