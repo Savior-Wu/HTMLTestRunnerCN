@@ -385,7 +385,7 @@ table       { font-size: 100%; }
 .passCase   { color: #5cb85c; }
 .failCase   { color: #d9534f; font-weight: bold; }
 .errorCase  { color: #f0ad4e; font-weight: bold; }
-.skipCase  { color: black; font-weigth: bold; }
+.skipCase  { color: #5cb85c; font-weigth: bold; }
 .hiddenRow  { display: none; }
 .testcase   { margin-left: 2em; }
 </style>
@@ -414,12 +414,12 @@ table       { font-size: 100%; }
     # 汉化,加美化效果 --Findyou
     REPORT_TMPL = """
 <p id='show_detail_line'>
-<a class="btn btn-info" href='javascript:showCase(3)'>ALL{ %(count)s }</a>
-<a class="btn btn-primary" href='javascript:showCase(4)'>Summary{ %(passrate)s }</a>
-<a class="btn btn-success" href='javascript:showCase(0)'>Passed{ %(Pass)s }</a>
-<a class="btn btn-danger" href='javascript:showCase(1)'>Failed{ %(fail)s }</a>
-<a class="btn btn-warning" href='javascript:showCase(2)'>Error{ %(error)s }</a>
-<a class="btn btn-info" href='javascript:showCase(5)'>Skipped{ %(skip)s }</a>
+<a class="btn btn-info" href='javascript:showCase(3)'>ALL %(count)s </a>
+<a class="btn btn-primary" href='javascript:showCase(4)'>Summary %(passrate)s </a>
+<a class="btn btn-success" href='javascript:showCase(0)'>Passed %(Pass)s </a>
+<a class="btn btn-danger" href='javascript:showCase(1)'>Failed %(fail)s </a>
+<a class="btn btn-warning" href='javascript:showCase(2)'>Error %(error)s </a>
+<a class="btn btn-info" href='javascript:showCase(5)'>Skipped %(skip)s </a>
 </p>
 <table id='result_table' class="table table-condensed table-bordered table-hover">
 <colgroup>
@@ -573,6 +573,7 @@ class _TestResult(TestResult):
         # But there are some path in unittest that would bypass this.
         # We must disconnect stdout in stopTest(), which is guaranteed to be called.
         
+        # reference: 
         if self.retry and self.retry>=1:
             if self.status == 1:
                 self.trys += 1
@@ -591,14 +592,13 @@ class _TestResult(TestResult):
                     doc = "" and test.shortDescription()
                     if doc.find('_retry') != -1:
                         doc = doc[:doc.find('_retry')]
-                    desc = "%s_retry_%s".format(doc, self.trys)
+                    desc = "{}_retry_{}".format(doc, self.trys)
                     test._testMethodDoc = desc
                     test(self)
                 else:
                     self.status = 0
                     self.trys = 0
         self.complete_output()
-
 
     def addSuccess(self, test):
         self.success_count += 1
@@ -660,7 +660,7 @@ class _TestResult(TestResult):
 class HTMLTestReportEN(Template_mixin):
     """
     """
-    def __init__(self, stream=sys.stdout, verbosity=1,title=None,description=None,tester=None):
+    def __init__(self, stream=sys.stdout, verbosity=1,title=None,description=None,tester=None, retry=2, save_last_retry=True):
         self.stream = stream
         self.verbosity = verbosity
         if title is None:
@@ -678,8 +678,11 @@ class HTMLTestReportEN(Template_mixin):
 
         self.startTime = datetime.datetime.now()
 
+        self.retry = retry
+        self.save_last_retry = save_last_retry
 
-    def run(self, test, files):
+
+    def run(self, test, files=None):
         "Run the given test case or test suite."
         "add branch read result from files"
         # result = _TestResult(self.verbosity)
@@ -688,27 +691,27 @@ class HTMLTestReportEN(Template_mixin):
         # self.generateReport(test, result)
         # # print >>sys.stderr, '\nTime Elapsed: %s' % (self.stopTime-self.startTime)
         # sys.stderr.write('\nTime Elapsed: %s' % (self.stopTime-self.startTime))
+        print(isinstance(files, dict))
         if not isinstance(files, dict):
             result = self.normal_run_before(test)
             self.stopTime = datetime.datetime.now()
-            self.generateReport(test, result)
         else:
             result = self.summary_result_files(files)
             self.stopTime = datetime.datetime.now()
-            self._generate_report_external(result)
+        self.generateReport(test, result, flag=True)
         sys.stderr.write('\nTime Elapsed: %s' % (self.stopTime-self.startTime))
         return result
 
 
     def normal_run_before(self, test):
         "use test case or test suite create result class, so that can keep origin method `run`"
-        result = _TestResult(self.verbosity)
+        result = _TestResult(self.verbosity, retry=self.retry, save_last_retry=self.save_last_retry)
         test(result)
         return result
 
     def result_to_file(self, test, file):
         "write test case result to json file so that can easily generate multi-processing test case"
-        result = _TestResult(test)
+        result = _TestResult(self.verbosity, retry=self.retry, save_last_retry=self.save_last_retry)
         test(result)
         sortresult = self.sortResult(result.result)
         cls_data = {}
@@ -788,7 +791,7 @@ class HTMLTestReportEN(Template_mixin):
         if result.skip_count:   status.append('Skip %s'   % result.skip_count  )
         if status:
             status = '，'.join(status)
-		# 合入Github：boafantasy代码
+        # 合入Github：boafantasy代码
             if (result.success_count + result.failure_count + result.error_count) > 0:
                 self.passrate = str("%.2f%%" % (float(result.success_count) / float(result.success_count + result.failure_count + result.error_count) * 100))
             else:
@@ -803,12 +806,15 @@ class HTMLTestReportEN(Template_mixin):
         ]
 
 
-    def generateReport(self, test, result):
+    def generateReport(self, test, result, flag=True):
         report_attrs = self.getReportAttributes(result)
         generator = 'HTMLTestReportEN %s' % __version__
         stylesheet = self._generate_stylesheet()
         heading = self._generate_heading(report_attrs)
-        report = self._generate_report(result)
+        if not flag:
+            report = self._generate_report_external(result)
+        else:
+            report = self._generate_report(result)
         ending = self._generate_ending()
         output = self.HTML_TMPL % dict(
             title = saxutils.escape(self.title),
@@ -847,7 +853,7 @@ class HTMLTestReportEN(Template_mixin):
         sortedResult = self.sortResult(result.result)
         for cid, (cls, cls_results) in enumerate(sortedResult):
             # subtotal for a class
-            np = nf = ne = 0
+            np = nf = ne = ns = 0
             for n,t,o,e in cls_results:
                 if n == 0: np += 1
                 elif n == 1: nf += 1
@@ -895,7 +901,7 @@ class HTMLTestReportEN(Template_mixin):
         has_output = bool(o or e)
         # ID修改点为下划线,支持Bootstrap折叠展开特效 - Findyou v0.8.2.1
         #增加error分类 - Findyou v0.8.2.3
-        tid = (n == 0 and 'p' or n == 1 and 'f' or n == 3 and 'e' or 's') + 't%s_%s' % (cid + 1, tid + 1)
+        tid = (n == 0 and 'p' or n == 1 and 'f' or n == 2 and 'e' or 's') + 't%s_%s' % (cid + 1, tid + 1)
         name = t.id().split('.')[-1]
         doc = t.shortDescription() or ""
         desc = doc and ('%s: %s' % (name, doc)) or name
@@ -906,19 +912,21 @@ class HTMLTestReportEN(Template_mixin):
         if isinstance(o, str):
             # TODO: some problem with 'string_escape': it escape \n and mess up formating
             # uo = unicode(o.encode('string_escape'))
-            try:
-                uo = o.decode('latin-1')
-            except:
-                uo = o.decode('utf-8')
+            # try:
+            #     uo = o.decode('latin-1')
+            # except:
+            #     uo = o.decode('utf-8')
+            uo = o
         else:
             uo = o
         if isinstance(e, str):
             # TODO: some problem with 'string_escape': it escape \n and mess up formating
             # ue = unicode(e.encode('string_escape'))
-            try:
-                ue = e.decode('latin-1')
-            except:
-                ue = e.decode('utf-8')
+            # try:
+            #     ue = e.decode('latin-1')
+            # except:
+            #     ue = e.decode('utf-8')
+            ue = e
         else:
             ue = e
 
@@ -1025,7 +1033,7 @@ class HTMLTestReportEN(Template_mixin):
             skip = str(skip_count),
             passrate = passrate,
             )
-            return report
+            return report, passrate
         else:
             return "the argument isn't an expected test result list"
 
